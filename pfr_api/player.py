@@ -1,12 +1,11 @@
 import re
-from operator import itemgetter
 
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
 from pfr_api.config import BASE_URL
-from pfr_api.parse import _parse_stats_table
+from pfr_api.parse.parse import parse_stats_table
 
 
 class Player(object):
@@ -43,23 +42,15 @@ class Player(object):
     def regular_season_gamelog(self, season: str = '') -> pd.DataFrame:
         soup = self._gamelog_page(season)
         results_table = soup.find('table', {'id': 'stats'})
-        columns, rows = _parse_stats_table(
+        columns, rows = parse_stats_table(
             results_table,
             stat_row_attributes={'id': re.compile('^stats\..*$')})
-        df = pd.DataFrame(
-            columns=list(map(itemgetter(0), columns)),
-            data=rows,
-        )
-        return df
+        return pd.DataFrame(columns=columns, data=rows)
 
     def playoffs_gamelog(self, season: str = '') -> pd.DataFrame:
         soup = self._gamelog_page(season)
         results_table = soup.find('table', {'id': 'stats_playoffs'})
-        columns, rows = _parse_stats_table(
+        columns, rows = parse_stats_table(
             results_table,
             stat_row_attributes={'id': re.compile('^stats\..*$')})
-        df = pd.DataFrame(
-            columns=list(map(itemgetter(0), columns)),
-            data=rows,
-        )
-        return df
+        return pd.DataFrame(columns=columns, data=rows)

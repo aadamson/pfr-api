@@ -1,11 +1,26 @@
-from operator import itemgetter
-
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
 from pfr_api.config import BASE_URL
-from pfr_api.parse import _parse_stats_table
+from pfr_api.parse.parse import parse_stats_table
+from pfr_api.parse.parser import FieldParser
+
+
+class PlayerFieldParser(FieldParser):
+    @property
+    def output_fields(self):
+        return ['player_id', 'player_csk',  'player_name']
+
+    def parse(self, field: BeautifulSoup):
+        player_id = field['data-append-csv']
+        player_csk = field['csk']
+        player_name = field.text
+        return {
+            'player_id': player_id,
+            'player_csk': player_csk,
+            'player_name': player_name
+        }
 
 
 class Fantasy(object):
@@ -24,11 +39,8 @@ class Fantasy(object):
     def rankings(self) -> pd.DataFrame:
         soup = self._fantasy_rankings_page()
         results_table = soup.find('table', {'id': 'fantasy'})
-        columns, rows = _parse_stats_table(
+        columns, rows = parse_stats_table(
             results_table,
-            stat_row_attributes={'class': lambda x: x != 'thead'})
-        df = pd.DataFrame(
-            columns=list(map(itemgetter(0), columns)),
-            data=rows,
-        )
-        return df
+            stat_row_attributes={'class': lambda x: x != 'thead'},
+            parsers={'player': PlayerFieldParser()})
+        return pd.DataFrame(columns=columns, data=rows)
