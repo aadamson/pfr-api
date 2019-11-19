@@ -1,10 +1,11 @@
 import abc
-from typing import List, Dict, Any
+from datetime import date, datetime, time
+from typing import Any, Dict, List, Type
 
 from bs4 import BeautifulSoup
 
 
-class FieldParser(abc.ABC):
+class RowParser(abc.ABC):
     @property
     @abc.abstractmethod
     def output_fields(self) -> List[str]:
@@ -15,92 +16,99 @@ class FieldParser(abc.ABC):
         raise NotImplementedError()
 
 
-def _identity_parser(field_name: str) -> FieldParser:
-    class _Parser(FieldParser):
-        @property
-        def output_fields(self) -> List[str]:
-            return [field_name]
+class UnaryFieldParser(RowParser):
+    def __init__(self, field_name: str):
+        self.field_name = field_name
 
-        def parse(self, field: BeautifulSoup) -> Dict[str, Any]:
-            return {field_name: field.text}
-    return _Parser()
+    @property
+    def output_fields(self) -> List[str]:
+        return [self.field_name]
 
 
-def _str_to_int_parser(field_name: str) -> FieldParser:
-    class _Parser(FieldParser):
-        @property
-        def output_fields(self) -> List[str]:
-            return [field_name]
+class DateStringParser(UnaryFieldParser):
+    def __init__(self, field_name: str, fmt: str = '%Y-%m-%d'):
+        super().__init__(field_name)
+        self.fmt = fmt
 
-        def parse(self, field: BeautifulSoup) -> Dict[str, Any]:
-            field_str = field.text
-            return {field_name: int(field_str)}
-    return _Parser()
-
-
-def _nullable_str_to_int_parser(field_name: str) -> FieldParser:
-    class _Parser(FieldParser):
-        @property
-        def output_fields(self) -> List[str]:
-            return [field_name]
-
-        def parse(self, field: BeautifulSoup) -> Dict[str, Any]:
-            field_str = field.text
-            if not field_str:
-                return {field_name: None}
-            return {field_name: int(field_str)}
-    return _Parser()
+    def parse(self, field: BeautifulSoup) -> Dict[str, date]:
+        date_string = field.text
+        return {
+            self.field_name: datetime.strptime(date_string, self.fmt).date()
+        }
 
 
-def _str_to_float_parser(field_name: str) -> FieldParser:
-    class _Parser(FieldParser):
-        @property
-        def output_fields(self) -> List[str]:
-            return [field_name]
+class TimeParser(UnaryFieldParser):
+    def __init__(self, field_name: str, fmt: str = '%H:%M%p %Z'):
+        super().__init__(field_name)
+        self.fmt = fmt
 
-        def parse(self, field: BeautifulSoup) -> Dict[str, Any]:
-            field_str = field.text
-            return {field_name: float(field_str)}
-    return _Parser()
-
-
-def _nullable_str_to_float_parser(field_name: str) -> FieldParser:
-    class _Parser(FieldParser):
-        @property
-        def output_fields(self) -> List[str]:
-            return [field_name]
-
-        def parse(self, field: BeautifulSoup) -> Dict[str, Any]:
-            field_str = field.text
-            if not field_str:
-                return {field_name: None}
-            return {field_name: float(field_str)}
-    return _Parser()
+    def parse(self, field: BeautifulSoup) -> Dict[str, time]:
+        date_string = field.text
+        return {
+            self.field_name: datetime.strptime(date_string, self.fmt).time()
+        }
 
 
-def _str_percentage_to_float_parser(field_name: str) -> FieldParser:
-    class _Parser(FieldParser):
-        @property
-        def output_fields(self) -> List[str]:
-            return [field_name]
-
-        def parse(self, field: BeautifulSoup) -> Dict[str, Any]:
-            field_str = field.text
-            percentage = float(field_str[:-1])
-            return {field_name: percentage / 100.}
-    return _Parser()
+class IdentityParser(UnaryFieldParser):
+    def parse(self, field: BeautifulSoup) -> Dict[str, Any]:
+        return {self.field_name: field.text}
 
 
-def _nullable_str_percentage_to_float_parser(field_name: str) -> FieldParser:
-    class _Parser(FieldParser):
-        @property
-        def output_fields(self) -> List[str]:
-            return [field_name]
+class StrToIntParser(UnaryFieldParser):
+    def parse(self, field: BeautifulSoup) -> Dict[str, Any]:
+        field_str = field.text
+        return {self.field_name: int(field_str)}
 
-        def parse(self, field: BeautifulSoup) -> Dict[str, Any]:
-            field_str = field.text
-            if not field_str:
-                return {field_name: None}
-            percentage = float(field_str[:-1])
-            return {field_name: percentage / 100.}
-    return _Parser()
+
+class NullableStrToIntParser(UnaryFieldParser):
+    def parse(self, field: BeautifulSoup) -> Dict[str, Any]:
+        field_str = field.text
+        if not field_str:
+            return {self.field_name: None}
+        return {self.field_name: int(field_str)}
+
+
+class StrToFloatParser(UnaryFieldParser):
+    def parse(self, field: BeautifulSoup) -> Dict[str, Any]:
+        field_str = field.text
+        return {self.field_name: float(field_str)}
+
+
+class NullableStrToFloatParser(UnaryFieldParser):
+    def parse(self, field: BeautifulSoup) -> Dict[str, Any]:
+        field_str = field.text
+        if not field_str:
+            return {self.field_name: None}
+        return {self.field_name: float(field_str)}
+
+
+class StrPercentageToFloatParser(UnaryFieldParser):
+    def parse(self, field: BeautifulSoup) -> Dict[str, Any]:
+        field_str = field.text
+        percentage = float(field_str[:-1])
+        return {self.field_name: percentage / 100.}
+
+
+class NullableStrPercentageToFloatParser(UnaryFieldParser):
+    def parse(self, field: BeautifulSoup) -> Dict[str, Any]:
+        field_str = field.text
+        if not field_str:
+            return {self.field_name: None}
+        percentage = float(field_str[:-1])
+        return {self.field_name: percentage / 100.}
+
+
+class PlayerRowParser(RowParser):
+    @property
+    def output_fields(self):
+        return ['player_id', 'player_csk',  'player_name']
+
+    def parse(self, field: BeautifulSoup):
+        player_id = field['data-append-csv']
+        player_csk = field['csk']
+        player_name = field.text
+        return {
+            'player_id': player_id,
+            'player_csk': player_csk,
+            'player_name': player_name
+        }

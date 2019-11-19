@@ -39,6 +39,15 @@ class Player(object):
         soup = BeautifulSoup(r.content, 'html.parser')
         return soup
 
+    def _fantasy_page(self, season: str = '') -> BeautifulSoup:
+        url = (
+            '{base}/fantasy/{season}'
+            .format(base=self._url_base(), season=season)
+        )
+        r = requests.get(url)
+        soup = BeautifulSoup(r.content, 'html.parser')
+        return soup
+
     def regular_season_gamelog(self, season: str = '') -> pd.DataFrame:
         soup = self._gamelog_page(season)
         results_table = soup.find('table', {'id': 'stats'})
@@ -53,4 +62,12 @@ class Player(object):
         columns, rows = parse_stats_table(
             results_table,
             stat_row_attributes={'id': re.compile('^stats\..*$')})
+        return pd.DataFrame(columns=columns, data=rows)
+
+    def fantasy(self, season: str = '') -> pd.DataFrame:
+        soup = self._fantasy_page(season)
+        results_table = soup.find('table', {'id': 'player_fantasy'})
+        # TODO handle weirdness with Inside 20 columns not being specific
+        #      in data-stat field
+        columns, rows = parse_stats_table(results_table)
         return pd.DataFrame(columns=columns, data=rows)
